@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harry Houdini's Great Escape</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #d4af37;
+            text-shadow: 2px 2px 4px #000;
+            margin-bottom: 5px;
+        }
+        .instructions {
+            max-width: 500px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(6, 60px);
+            grid-template-rows: repeat(6, 60px);
+            gap: 5px;
+            background-color: #333;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+        }
+        .cell {
+            background-color: #444;
+            border: 1px solid #555;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            transition: background-color 0.2s;
+        }
+        .cell.houdini {
+            background-color: #d4af37 !important;
+            color: #000;
+            box-shadow: inset 0 0 10px #fff;
+        }
+        .cell.start {
+            border: 2px solid #5cb85c;
+        }
+        .cell.exit {
+            border: 2px solid #d9534f;
+            color: #d9534f;
+        }
+        #controls {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            gap: 10px;
+        }
+        button {
+            background-color: #d4af37;
+            color: #000;
+            border: none;
+            padding: 15px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 4px #9a7b1c;
+        }
+        button:active {
+            box-shadow: 0 1px #9a7b1c;
+            transform: translateY(3px);
+        }
+        #up { grid-column: 2; }
+        #left { grid-column: 1; }
+        #right { grid-column: 3; }
+        #down { grid-column: 2; }
+
+        #message-box {
+            margin-top: 25px;
+            min-height: 50px;
+            max-width: 500px;
+            text-align: center;
+            font-weight: bold;
+            color: #ff4d4d;
+        }
+        .success {
+            color: #5cb85c !important;
+            background-color: #222;
+            padding: 15px;
+            border: 2px solid #5cb85c;
+            border-radius: 5px;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Houdini's Escape</h1>
+    <div class="instructions">
+        Guide Harry Houdini across the 6x6 tiled room. Avoid the hidden trap doors to reach the exit at the top-right. Use the buttons or your keyboard arrow keys to move. One wrong step sends you back to the start!
+    </div>
+
+    <div id="grid"></div>
+
+    <div id="controls">
+        <button id="up">↑</button>
+        <button id="left">←</button>
+        <button id="right">→</button>
+        <button id="down">↓</button>
+    </div>
+
+    <div id="message-box" id="status">Use buttons or arrow keys to start moving...</div>
+
+    <script>
+        // Grid setup: 0-indexed internally (0 to 5)
+        // JavaScript grid coordinates: (0,0) is top-left, (5,5) is bottom-left
+        // To match standard chart layouts, we will render it so rows flip visually.
+        let currentX = 0; // Column index (0 to 5)
+        let currentY = 5; // Row index (0 to 5) -> Starts at bottom-left
+        
+        const startX = 0, startY = 5;
+        const exitX = 5, exitY = 0; // Top-right
+
+        const finalNumbers = "704303 978311 892218";
+
+        // Map array matching your specific path:
+        // True = safe, False = trap
+        // Rows from top (index 0) to bottom (index 5)
+        const safePath = [
+            [false, false, false, false, true,  true],  // Row 0 (Top)
+            [false, false, false, false, true,  false], // Row 1
+            [false, false, true,  true,  true,  false], // Row 2
+            [false, true,  true,  false, false, false], // Row 3
+            [false, true,  false, false, false, false], // Row 4
+            [true,  true,  false, false, false, false]  // Row 5 (Bottom)
+        ];
+
+        const gridElement = document.getElementById('grid');
+        const messageBox = document.getElementById('message-box');
+
+        // Create the map cells visually
+        function createGrid() {
+            gridElement.innerHTML = '';
+            for (let r = 0; r < 6; r++) {
+                for (let c = 0; c < 6; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.id = `cell-${c}-${r}`;
+                    
+                    if (c === startX && r === startY) cell.classList.add('start');
+                    if (c === exitX && r === exitY) {
+                        cell.classList.add('exit');
+                        cell.innerText = "EXIT";
+                    }
+                    
+                    gridElement.appendChild(cell);
+                }
+            }
+            updatePlayerPosition();
+        }
+
+        function updatePlayerPosition() {
+            // Remove previous player styling
+            document.querySelectorAll('.cell').forEach(el => el.classList.remove('houdini'));
+            // Add to current tile
+            const currentCell = document.getElementById(`cell-${currentX}-${currentY}`);
+            if (currentCell) {
+                currentCell.classList.add('houdini');
+            }
+        }
+
+        function checkTile() {
+            if (!safePath[currentY][currentX]) {
+                messageBox.innerHTML = "SNAP! You stepped on a hidden trap door! Houdini fell through and had to restart from the beginning room entrance.";
+                messageBox.style.color = "#ff4d4d";
+                currentX = startX;
+                currentY = startY;
+                updatePlayerPosition();
+            } else if (currentX === exitX && currentY === exitY) {
+                messageBox.className = "success";
+                messageBox.innerHTML = `SUCCESS! Houdini escaped!<br><br>Your Secret Code Numbers are:<br><span style="font-size:1.5rem; color:#fff;">${finalNumbers}</span>`;
+                // Disable controls upon winning
+                document.removeEventListener('keydown', handleKeyDown);
+                document.getElementById('controls').style.display = 'none';
+            } else {
+                messageBox.innerHTML = "So far, so good... the floor feels stable.";
+                messageBox.style.color = "#e0e0e0";
+            }
+        }
+
+        function move(direction) {
+            if (currentX === exitX && currentY === exitY) return; // Already won
+
+            if (direction === 'up' && currentY > 0) currentY--;
+            else if (direction === 'down' && currentY < 5) currentY++;
+            else if (direction === 'left' && currentX > 0) currentX--;
+            else if (direction === 'right' && currentX < 5) currentX++;
+            else {
+                messageBox.innerHTML = "A cold brick wall blocks that path.";
+                messageBox.style.color = "#ffaa00";
+                return;
+            }
+
+            updatePlayerPosition();
+            checkTile();
+        }
+
+        // Button Click Event Listeners
+        document.getElementById('up').addEventListener('click', () => move('up'));
+        document.getElementById('down').addEventListener('click', () => move('down'));
+        document.getElementById('left').addEventListener('click', () => move('left'));
+        document.getElementById('right').addEventListener('click', () => move('right'));
+
+        // Keyboard Event Listener
+        function handleKeyDown(e) {
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') move('up');
+            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') move('down');
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') move('left');
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') move('right');
+        }
+        document.addEventListener('keydown', handleKeyDown);
+
+        // Run game initialization
+        createGrid();
+    </script>
+</body>
+</html>
